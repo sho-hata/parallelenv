@@ -1,0 +1,12 @@
+version-file = "internal/version/version"
+
+# hook scripts
+[hooks]
+
+# git hook pre push
+pre-push = [
+    "echo 'golangci-lint run'",
+    "golangci-lint run",
+    "echo 'go test ./...'",
+    "go test ./..."
+]

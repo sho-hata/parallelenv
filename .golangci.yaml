@@ -1,0 +1,26 @@
+linters:
+  disable-all: true
+  enable:
+    - deadcode
+    - errcheck
+    - gosimple
+    - gocognit
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - varcheck
+    - asciicheck
+    - dogsled
+    - exhaustive
+    - exportloopref
+    - errorlint
+    - durationcheck
+    - gofmt
+    - goprintffuncname
+    - nestif
+    - makezero
+    - prealloc
+    - predeclared
+    - unconvert
