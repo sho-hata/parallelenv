@@ -1,6 +1,5 @@
 package a
 
-func f() {
-	var gopher int
-	print(gopher)
+func f(s string) (string, error) {
+	return s, nil
 }

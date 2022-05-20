@@ -2,6 +2,7 @@ package parallelenv
 
 import (
 	"go/ast"
+	"go/token"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
@@ -33,8 +34,71 @@ func run(pass *analysis.Pass) (interface{}, error) {
 			if !strings.HasSuffix(pass.Fset.File(n.Pos()).Name(), "_test.go") {
 				return
 			}
+
+			for _, decl := range n.Decls {
+				fnDecl, ok := decl.(*ast.FuncDecl)
+				if !ok {
+					continue
+				}
+				checkFnDecl(pass, fnDecl)
+			}
 		}
 	})
 
 	return nil, nil
+}
+
+type checkState struct {
+	isSetEnv   bool
+	isParallel bool
+	positions  []token.Pos
+}
+
+func (s *checkState) shouldReport() bool {
+	return s.isSetEnv && s.isParallel
+}
+
+// checkFnDecl
+// In the Body part of the function declaration, check whether t.Parallel and t.SetEnv appear at the same time.
+func checkFnDecl(pass *analysis.Pass, fnDecl *ast.FuncDecl) {
+	state := checkState{}
+	for _, stmt := range fnDecl.Body.List {
+		switch stmt := stmt.(type) {
+		case *ast.ExprStmt:
+			state = shouldReportExprStmt(stmt, state)
+		}
+	}
+	if state.shouldReport() {
+		for _, pos := range state.positions {
+			pass.Reportf(pos, "cannot set environment variables in parallel tests")
+		}
+	}
+}
+
+func shouldReportExprStmt(stmt *ast.ExprStmt, checkState checkState) checkState {
+	callExpr, ok := stmt.X.(*ast.CallExpr)
+	if !ok {
+		return checkState
+	}
+	fn, ok := callExpr.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return checkState
+	}
+
+	ident, ok := fn.X.(*ast.Ident)
+	if !ok {
+		return checkState
+	}
+	targetName := ident.Name + "." + fn.Sel.Name
+
+	if targetName == "t.Parallel" {
+		checkState.isParallel = true
+		checkState.positions = append(checkState.positions, stmt.Pos())
+	}
+	if targetName == "t.Setenv" {
+		checkState.isSetEnv = true
+		checkState.positions = append(checkState.positions, stmt.Pos())
+	}
+
+	return checkState
 }
