@@ -3,6 +3,7 @@ package a
 import "testing"
 
 func Test_f(t *testing.T) {
+	t.Skip()
 	t.Parallel()                 // want "cannot set environment variables in parallel tests"
 	t.Setenv("SAMPLE", "sample") // want "cannot set environment variables in parallel tests"
 

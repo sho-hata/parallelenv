@@ -7,6 +7,6 @@ version-file = "internal/version/version"
 pre-push = [
     "echo 'golangci-lint run'",
     "golangci-lint run",
-    "echo 'go test ./parallelenv_test.go'",
-    "go test ./parallelenv_test.go",
+    "echo 'go test ./... -short'",
+    "go test ./... -short",
 ]
