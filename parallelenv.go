@@ -48,20 +48,58 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	return nil, nil
 }
 
-type checkState struct {
-	isSetEnv   bool
-	isParallel bool
-	positions  []token.Pos
+type target int
+
+const (
+	unknown target = iota
+	setEnv
+	parallel
+)
+
+func (t target) isValid() bool {
+	switch t {
+	case setEnv, parallel:
+		return true
+	case unknown:
+		return false
+	}
+	return false
 }
 
-func (s *checkState) shouldReport() bool {
-	return s.isSetEnv && s.isParallel
+func sToTarget(s string) target {
+	if t, ok := map[string]target{"t.Setenv": setEnv, "t.Parallel": parallel}[s]; ok {
+		return t
+	}
+
+	return unknown
+}
+
+// checkState
+// manages the location in the source code where the check target appears.
+type checkState map[target][]token.Pos
+
+func newCheckState() checkState {
+	return checkState{setEnv: nil, parallel: nil}
+}
+
+// shouldReport
+// Returns whether to report it as an error or not
+func (s checkState) shouldReport() bool {
+	if pos, ok := s[setEnv]; !ok || len(pos) == 0 {
+		return false
+	}
+
+	if pos, ok := s[parallel]; !ok || len(pos) == 0 {
+		return false
+	}
+
+	return true
 }
 
 // checkFnDecl
 // In the Body part of the function declaration, check whether t.Parallel and t.SetEnv appear at the same time.
 func checkFnDecl(pass *analysis.Pass, fnDecl *ast.FuncDecl) {
-	state := checkState{}
+	state := newCheckState()
 	for _, stmt := range fnDecl.Body.List {
 		switch stmt := stmt.(type) {
 		case *ast.ExprStmt:
@@ -69,8 +107,10 @@ func checkFnDecl(pass *analysis.Pass, fnDecl *ast.FuncDecl) {
 		}
 	}
 	if state.shouldReport() {
-		for _, pos := range state.positions {
-			pass.Reportf(pos, "cannot set environment variables in parallel tests")
+		for _, pos := range state {
+			for _, p := range pos {
+				pass.Reportf(p, "cannot set environment variables in parallel tests")
+			}
 		}
 	}
 }
@@ -89,15 +129,10 @@ func shouldReportExprStmt(stmt *ast.ExprStmt, checkState checkState) checkState 
 	if !ok {
 		return checkState
 	}
-	targetName := ident.Name + "." + fn.Sel.Name
 
-	if targetName == "t.Parallel" {
-		checkState.isParallel = true
-		checkState.positions = append(checkState.positions, stmt.Pos())
-	}
-	if targetName == "t.Setenv" {
-		checkState.isSetEnv = true
-		checkState.positions = append(checkState.positions, stmt.Pos())
+	target := sToTarget(ident.Name + "." + fn.Sel.Name)
+	if ok := target.isValid(); ok {
+		checkState[target] = append(checkState[target], stmt.Pos())
 	}
 
 	return checkState

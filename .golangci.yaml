@@ -1,15 +1,18 @@
+
+run:
+  go: '1.18'
 linters:
   disable-all: true
   enable:
     - deadcode
     - errcheck
-    - gosimple
+    # - gosimple
     - gocognit
     - govet
     - ineffassign
-    - staticcheck
+    # - staticcheck
     - typecheck
-    - unused
+    # - unused
     - varcheck
     - asciicheck
     - dogsled
@@ -24,3 +27,4 @@ linters:
     - prealloc
     - predeclared
     - unconvert
+

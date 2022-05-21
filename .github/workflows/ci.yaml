@@ -1,0 +1,27 @@
+name: ci
+on:
+  push:
+    branches:
+      - "**"
+  pull_request: {}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: setup go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+
+      - name: checkout
+        uses: actions/checkout@v2
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          args: -c .golangci.yaml
+
+      - name: test
+        run: go test -v ./... -short
