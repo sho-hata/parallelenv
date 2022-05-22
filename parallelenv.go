@@ -40,7 +40,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				if !ok {
 					continue
 				}
-				checkFnDecl(pass, fnDecl)
+				report(pass, fnDecl)
 			}
 		}
 	})
@@ -96,15 +96,12 @@ func (s checkState) shouldReport() bool {
 	return true
 }
 
-// checkFnDecl
+// report
 // In the Body part of the function declaration, check whether t.Parallel and t.SetEnv appear at the same time.
-func checkFnDecl(pass *analysis.Pass, fnDecl *ast.FuncDecl) {
+func report(pass *analysis.Pass, fnDecl *ast.FuncDecl) {
 	state := newCheckState()
 	for _, stmt := range fnDecl.Body.List {
-		switch stmt := stmt.(type) {
-		case *ast.ExprStmt:
-			state = shouldReportExprStmt(stmt, state)
-		}
+		state = checkStmt(stmt, state)
 	}
 	if state.shouldReport() {
 		for _, pos := range state {
@@ -113,6 +110,20 @@ func checkFnDecl(pass *analysis.Pass, fnDecl *ast.FuncDecl) {
 			}
 		}
 	}
+}
+
+func checkStmt(stmt ast.Stmt, state checkState) checkState {
+	switch stmt := stmt.(type) {
+	case *ast.ExprStmt:
+		state = shouldReportExprStmt(stmt, state)
+	case *ast.IfStmt:
+		state = shouldReportIfStmt(stmt, state)
+	case *ast.BlockStmt:
+		for _, s := range stmt.List {
+			state = checkStmt(s, state)
+		}
+	}
+	return state
 }
 
 func shouldReportExprStmt(stmt *ast.ExprStmt, checkState checkState) checkState {
@@ -136,4 +147,16 @@ func shouldReportExprStmt(stmt *ast.ExprStmt, checkState checkState) checkState 
 	}
 
 	return checkState
+}
+
+func shouldReportIfStmt(stmt *ast.IfStmt, state checkState) checkState {
+	for _, s := range stmt.Body.List {
+		state = checkStmt(s, state)
+	}
+
+	if (stmt.Else) != nil {
+		state = checkStmt(stmt.Else, state)
+	}
+
+	return state
 }
