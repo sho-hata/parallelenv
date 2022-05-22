@@ -10,6 +10,7 @@ go install github.com/sho-hata/parallelenv/cmd/parallelenv@latest
 
 ## Usage
 
+### test file Example
 ```go
 package main
 
@@ -24,13 +25,15 @@ func TestMain(t *testing.T) {
 
 ```
 
+### Analysis
 ```sh
-go vet -vettool=(which parallelenv) ./...
+$ go vet -vettool=(which parallelenv) ./...
 
 ./main_test.go:7:2: cannot set environment variables in parallel tests
 ./main_test.go:8:2: cannot set environment variables in parallel tests
 ```
 
+## CI
 ### CircleCI
 
 ```yaml
