@@ -20,7 +20,7 @@ func Test_target_isValid(t *testing.T) {
 		tr   target
 		want bool
 	}{
-		"valid value":        {setEnv, isValid},
+		"valid value":        {tSetEnv, isValid},
 		"unknown value":      {unknown, isNotValid},
 		"out of range value": {-1, isNotValid},
 	}
@@ -41,7 +41,7 @@ func Test_sToTarget(t *testing.T) {
 		s    string
 		want target
 	}{
-		"success": {"t.Setenv", setEnv},
+		"success": {"t.Setenv", tSetEnv},
 		"failed":  {"t.Short", unknown},
 	}
 	for name, tt := range tests {
@@ -50,27 +50,6 @@ func Test_sToTarget(t *testing.T) {
 			t.Parallel()
 			if got := sToTarget(tt.s); got != tt.want {
 				t.Errorf("sToTarget() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_checkState_shouldReport(t *testing.T) {
-	t.Parallel()
-	tests := map[string]struct {
-		s    checkState
-		want bool
-	}{
-		"should report":                {checkState{parallel: {11111}, setEnv: {111111}}, true},
-		"only the Setenv was called":   {checkState{setEnv: {11111}}, false},
-		"only the parallel was called": {checkState{parallel: {11111}}, false},
-	}
-	for name, tt := range tests {
-		tt := tt
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			if got := tt.s.shouldReport(); got != tt.want {
-				t.Errorf("checkState.shouldReport() = %v, want %v", got, tt.want)
 			}
 		})
 	}

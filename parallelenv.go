@@ -36,11 +36,9 @@ func run(pass *analysis.Pass) (interface{}, error) {
 			}
 
 			for _, decl := range n.Decls {
-				fnDecl, ok := decl.(*ast.FuncDecl)
-				if !ok {
-					continue
+				if fnDecl, ok := decl.(*ast.FuncDecl); ok {
+					analyze(pass, fnDecl)
 				}
-				report(pass, fnDecl)
 			}
 		}
 	})
@@ -52,111 +50,150 @@ type target int
 
 const (
 	unknown target = iota
-	setEnv
-	parallel
+	tSetEnv
+	tParallel
 )
 
 func (t target) isValid() bool {
 	switch t {
-	case setEnv, parallel:
+	case tSetEnv, tParallel:
 		return true
 	case unknown:
 		return false
 	}
+
 	return false
 }
 
 func sToTarget(s string) target {
-	if t, ok := map[string]target{"t.Setenv": setEnv, "t.Parallel": parallel}[s]; ok {
+	if t, ok := map[string]target{"t.Setenv": tSetEnv, "t.Parallel": tParallel}[s]; ok {
 		return t
 	}
 
 	return unknown
 }
 
-// checkState
+type testLevel = int
+
+const mainTest testLevel = 0
+
+// results
 // manages the location in the source code where the check target appears.
-type checkState map[target][]token.Pos
+type results map[testLevel][]*result
 
-func newCheckState() checkState {
-	return checkState{setEnv: nil, parallel: nil}
+type result struct {
+	target target
+	pos    token.Pos
 }
 
-// shouldReport
-// Returns whether to report it as an error or not
-func (s checkState) shouldReport() bool {
-	if pos, ok := s[setEnv]; !ok || len(pos) == 0 {
-		return false
-	}
+func (rs results) ShouldReportResults() results {
+	for testLevel, res := range rs {
+		var callSetEnv, callParallel int
 
-	if pos, ok := s[parallel]; !ok || len(pos) == 0 {
-		return false
-	}
-
-	return true
-}
-
-// report
-// In the Body part of the function declaration, check whether t.Parallel and t.SetEnv appear at the same time.
-func report(pass *analysis.Pass, fnDecl *ast.FuncDecl) {
-	state := newCheckState()
-	for _, stmt := range fnDecl.Body.List {
-		state = checkStmt(stmt, state)
-	}
-	if state.shouldReport() {
-		for _, pos := range state {
-			for _, p := range pos {
-				pass.Reportf(p, "cannot set environment variables in parallel tests")
+		for _, r := range res {
+			switch r.target {
+			case tSetEnv:
+				callSetEnv++
+			case tParallel:
+				callParallel++
+			case unknown:
 			}
 		}
-	}
-}
 
-func checkStmt(stmt ast.Stmt, state checkState) checkState {
-	switch stmt := stmt.(type) {
-	case *ast.ExprStmt:
-		state = shouldReportExprStmt(stmt, state)
-	case *ast.IfStmt:
-		state = shouldReportIfStmt(stmt, state)
-	case *ast.BlockStmt:
-		for _, s := range stmt.List {
-			state = checkStmt(s, state)
+		if callSetEnv == 0 || callParallel == 0 {
+			delete(rs, testLevel)
 		}
 	}
-	return state
+
+	return rs
 }
 
-func shouldReportExprStmt(stmt *ast.ExprStmt, checkState checkState) checkState {
+func (rs results) report(pass *analysis.Pass) {
+	for _, results := range rs {
+		for _, result := range results {
+			pass.Reportf(result.pos, "cannot set environment variables in parallel tests")
+		}
+	}
+}
+
+// analyze
+// In the Body part of the function declaration, check whether t.Parallel and t.SetEnv appear at the same time.
+func analyze(pass *analysis.Pass, fnDecl *ast.FuncDecl) {
+	state := results{}
+
+	for _, stmt := range fnDecl.Body.List {
+		state = state.check(stmt, mainTest)
+	}
+
+	state.ShouldReportResults().report(pass)
+}
+
+func (rs results) check(stmt ast.Stmt, testLevel testLevel) results {
+	switch stmt := stmt.(type) {
+	case *ast.ExprStmt:
+		rs = rs.checkExprStmt(stmt, testLevel)
+	case *ast.IfStmt:
+		rs = rs.checkIfStmt(stmt, testLevel)
+	case *ast.BlockStmt:
+		for _, s := range stmt.List {
+			rs = rs.check(s, testLevel)
+		}
+	case *ast.RangeStmt:
+		rs = rs.check(stmt.Body, testLevel)
+	}
+
+	return rs
+}
+
+func (rs results) checkExprStmt(stmt *ast.ExprStmt, testLevel testLevel) results {
 	callExpr, ok := stmt.X.(*ast.CallExpr)
 	if !ok {
-		return checkState
+		return rs
 	}
+
 	fn, ok := callExpr.Fun.(*ast.SelectorExpr)
 	if !ok {
-		return checkState
+		return rs
 	}
 
 	ident, ok := fn.X.(*ast.Ident)
 	if !ok {
-		return checkState
+		return rs
 	}
 
-	target := sToTarget(ident.Name + "." + fn.Sel.Name)
+	fnName := ident.Name + "." + fn.Sel.Name
+
+	if fnName == "t.Run" {
+		testLevel++
+
+		for _, expr := range callExpr.Args {
+			switch e := expr.(type) {
+			case *ast.FuncLit:
+				for _, s := range e.Body.List {
+					rs = rs.check(s, testLevel)
+				}
+			}
+		}
+
+		return rs
+	}
+
+	target := sToTarget(fnName)
 	if ok := target.isValid(); ok {
-		checkState[target] = append(checkState[target], stmt.Pos())
+		rs[testLevel] = append(rs[testLevel], &result{target: target, pos: stmt.Pos()})
 	}
 
-	return checkState
+	return rs
 }
 
-func shouldReportIfStmt(stmt *ast.IfStmt, state checkState) checkState {
+func (rs results) checkIfStmt(stmt *ast.IfStmt, testLevel testLevel) results {
 	for _, s := range stmt.Body.List {
-		state = checkStmt(s, state)
+		rs = rs.check(s, testLevel)
 	}
 
 	if (stmt.Else) != nil {
-		state = checkStmt(stmt.Else, state)
+		rs = rs.check(stmt.Else, testLevel)
 	}
 
-	return state
+	return rs
 }
