@@ -1,4 +1,4 @@
-name: ci
+name: test_and_lint
 on:
   push:
     branches:
