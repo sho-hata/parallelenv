@@ -86,7 +86,7 @@ type result struct {
 	pos    token.Pos
 }
 
-func (rs results) ShouldReportResults() results {
+func (rs results) shouldReportResults() results {
 	for testLevel, res := range rs {
 		var callSetEnv, callParallel int
 
@@ -117,7 +117,7 @@ func (rs results) report(pass *analysis.Pass) {
 }
 
 // analyze
-// In the Body part of the function declaration, check whether t.Parallel and t.SetEnv appear at the same time.
+// In the Body part of the function declaration, check whether t.Parallel and t.Setenv appear at the same time.
 func analyze(pass *analysis.Pass, fnDecl *ast.FuncDecl) {
 	state := results{}
 
@@ -125,7 +125,7 @@ func analyze(pass *analysis.Pass, fnDecl *ast.FuncDecl) {
 		state = state.check(stmt, mainTest)
 	}
 
-	state.ShouldReportResults().report(pass)
+	state.shouldReportResults().report(pass)
 }
 
 func (rs results) check(stmt ast.Stmt, testLevel testLevel) results {
