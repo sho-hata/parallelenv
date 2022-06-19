@@ -5,13 +5,10 @@ linters:
   enable:
     - deadcode
     - errcheck
-    # - gosimple
     - gocognit
     - govet
     - ineffassign
-    # - staticcheck
     - typecheck
-    # - unused
     - varcheck
     - asciicheck
     - dogsled

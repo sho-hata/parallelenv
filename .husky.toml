@@ -5,8 +5,8 @@ version-file = "internal/version/version"
 
 # git hook pre push
 pre-push = [
-    "echo 'golangci-lint run'",
-    "golangci-lint run",
+    "echo 'golangci-lint run ./... -c .golangci.yaml'",
+    "golangci-lint run ./... -c .golangci.yaml",
     "echo 'go test ./... -short'",
     "go test ./... -short",
 ]
