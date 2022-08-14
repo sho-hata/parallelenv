@@ -8,7 +8,7 @@ Calls to `t.Parallel()` and `t.Setenv()` in the test function will cause a panic
 We created this tool in the hope that it would be noticed by static analysis before the tests are run.
 
 [![test_and_lint](https://github.com/sho-hata/parallelenv/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/sho-hata/parallelenv/actions/workflows/ci.yaml)
-## Instruction
+## installation
 
 ```sh
 go install github.com/sho-hata/parallelenv/cmd/parallelenv@latest
