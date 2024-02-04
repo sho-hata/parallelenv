@@ -1,6 +1,6 @@
 module github.com/sho-hata/parallelenv
 
-go 1.18
+go 1.21
 
 require (
 	github.com/gostaticanalysis/testutil v0.4.0
